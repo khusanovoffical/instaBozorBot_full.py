@@ -74,7 +74,7 @@ def sotish_boshlash(m):
     bot.register_next_step_handler(m, get_link)
 
 def get_link(m):
-    user_data[m.chat.id] = {'link': m.text}
+    user_data[m.chat.id] = {'link': m.text, 'username': m.from_user.username or m.from_user.first_name}
     bot.send_message(m.chat.id, "2️⃣ Obunachilar sonini yozing:")
     bot.register_next_step_handler(m, get_followers)
 
@@ -109,11 +109,12 @@ def get_features(m):
 
     text = (
         f"📩 *Yangi akkaunt so‘rovi*\n\n"
+        f"👤 Sotuvchi: @{info['username']}\n"
         f"🔗 Havola: {info['link']}\n"
         f"👥 Obunachilar: {info['followers']}\n"
         f"💰 Narxi: {info['price']} so‘m\n"
-        f"⭐ Afzalliklar: {info['features']}\n\n"
-        f"👤 Foydalanuvchi: @{m.from_user.username or m.from_user.first_name}"
+        f"⭐ Afzalliklar: {info['features']}\n"
+        f"🆔 Foydalanuvchi ID: `{m.chat.id}`"
     )
 
     markup = types.InlineKeyboardMarkup()
@@ -122,14 +123,16 @@ def get_features(m):
         types.InlineKeyboardButton("❌ Noto‘g‘ri", callback_data=f"no_{m.chat.id}")
     )
 
-    media_group = []
-    for photo_id in info['photos']:
-        media_group.append(telebot.types.InputMediaPhoto(photo_id))
-    if media_group:
-        bot.send_media_group(ADMIN_ID, media_group)
-    bot.send_message(ADMIN_ID, text, parse_mode="Markdown", reply_markup=markup)
+    # 🔸 Admin uchun rasm + ma’lumot birgalikda yuboriladi
+    photos = info['photos']
+    if photos:
+        bot.send_photo(ADMIN_ID, photos[0], caption=text, parse_mode="Markdown", reply_markup=markup)
+        for p in photos[1:]:
+            bot.send_photo(ADMIN_ID, p)
+    else:
+        bot.send_message(ADMIN_ID, text, parse_mode="Markdown", reply_markup=markup)
 
-    bot.send_message(m.chat.id, "✅ Raxmat! Maʼlumotlar adminga yuborildi. 24 soatda tekshiriladi.")
+    bot.send_message(m.chat.id, "✅ Rahmat! Maʼlumotlar adminga yuborildi. 24 soatda tekshiriladi.")
 
 
 # 🔹 Admin javoblari
@@ -144,9 +147,7 @@ def check_request(call):
 
     if call.data.startswith("ok_"):
         # Kanalga joylash
-        media_group = []
-        for photo_id in info['photos']:
-            media_group.append(telebot.types.InputMediaPhoto(photo_id))
+        photos = info['photos']
         caption = (
             f"📸 *Yangi akkaunt!*\n\n"
             f"🔗 {info['link']}\n"
@@ -154,13 +155,17 @@ def check_request(call):
             f"💰 Narxi: {info['price']} so‘m\n"
             f"⭐ Afzalliklar: {info['features']}"
         )
-        if media_group:
-            media_group[0].caption = caption
-            media_group[0].parse_mode = "Markdown"
-            bot.send_media_group(CHANNEL_ID, media_group)
 
+        if photos:
+            bot.send_photo(CHANNEL_ID, photos[0], caption=caption, parse_mode="Markdown")
+            for p in photos[1:]:
+                bot.send_photo(CHANNEL_ID, p)
+        else:
+            bot.send_message(CHANNEL_ID, caption, parse_mode="Markdown")
+
+        # 💬 Sotib olish tugmasi — ADMIN bilan bog‘lanadi
         markup = types.InlineKeyboardMarkup()
-        markup.add(types.InlineKeyboardButton("💬 Akkaunt sotib olish", url=f"tg://user?id={user_id}"))
+        markup.add(types.InlineKeyboardButton("💬 Akkaunt sotib olish", url=f"tg://user?id={ADMIN_ID}"))
         bot.send_message(CHANNEL_ID, "👇 Quyidagi tugmani bosing:", reply_markup=markup)
 
         bot.send_message(user_id, "✅ Akkauntingiz kanalga joylandi!")
@@ -182,7 +187,7 @@ def admin_panel(m):
     text = (
         f"📊 *Admin panel:*\n\n"
         f"👥 Foydalanuvchilar: {users}\n"
-        f"📦 Kanalga joylangan akkauntlar: {posts}\n\n"
+        f"📦 Joylangan akkauntlar: {posts}\n\n"
         f"🪄 Kanal: {CHANNEL_USERNAME}"
     )
     bot.send_message(m.chat.id, text, parse_mode="Markdown")
